@@ -330,6 +330,7 @@ class Worker:
           ``at_most_once`` activities the outcome is unknowable, so the activity fails
           with the non-retryable ``ActivityOutcomeUnknown`` and the workflow decides.
         * Waiting for a retry -> nothing to do; its timer row survived the crash.
+        * Open signal waits are matched against signals already in history.
         """
         to_start: list[tuple[int, int]] = []
         for st in rt.view.pending_activities():
@@ -352,6 +353,9 @@ class Worker:
                 to_start.append((st.cmd, 1))
         if to_start:
             self._start_attempts(rt, to_start)
+        # A crash between recording a wait and matching it to an already-buffered
+        # signal leaves both in history with nothing left to trigger the match.
+        self._resolve_signals(rt)
         rt.dirty = True
 
     # -- activities -------------------------------------------------------------------------
