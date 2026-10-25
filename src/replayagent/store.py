@@ -174,8 +174,12 @@ class Store:
         )
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute(f"PRAGMA synchronous={synchronous}")
-        self._init_schema()
+        try:
+            self._conn.execute(f"PRAGMA synchronous={synchronous}")
+            self._init_schema()
+        except BaseException:
+            self._conn.close()
+            raise
 
     def _init_schema(self) -> None:
         with self._lock:
