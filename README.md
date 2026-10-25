@@ -159,7 +159,7 @@ $ replayagent show research-demo
   ...
   status     running
   history    20 events, 7 commands
-  owner      <host>/64734/38df5ca6
+  owner      <host>/73465/e3eb58ef
   pending
     activity #4 tool.search_corpus: running attempt 1
     activity #5 tool.search_corpus: running attempt 1
@@ -197,15 +197,15 @@ $ replayagent worker --app replayagent.examples.research:create_app --until rese
 === 8. history (first 14 and last 12 events) ===
    seq        t+s  event                   cmd  details
   ...
-    49      0.402  SignalWaitStarted        15  review timeout=86400.0
-    50      0.533  SignalReceived            -  review payload={"approve":true}
-    51      0.533  SignalConsumed           15  review from event 50 payload={"approve":true}
-    52      0.534  ActivityScheduled        16  research.publish args=[{"question":"How do durable execution engines …
-    53      0.534  ActivityStarted          16  attempt=1
-    54      0.599  ActivityAttemptFailed    16  attempt=1 WorkerLost: worker stopped while at… retry_in=0.000s
-    55      0.600  ActivityStarted          16  attempt=2
-    56      0.602  ActivityCompleted        16  attempt=2 result={"chars":1614,"path":"research-demo.md"}
-    57      0.603  WorkflowCompleted         -  result={"citation_check":{"cited":["idempotency-keys",…
+    49      0.395  SignalWaitStarted        15  review timeout=86400.0
+    50      0.522  SignalReceived            -  review payload={"approve":true}
+    51      0.523  SignalConsumed           15  review from event 50 payload={"approve":true}
+    52      0.523  ActivityScheduled        16  research.publish args=[{"question":"How do durable execution engines …
+    53      0.524  ActivityStarted          16  attempt=1
+    54      0.594  ActivityAttemptFailed    16  attempt=1 WorkerLost: worker stopped while at… retry_in=0.000s
+    55      0.595  ActivityStarted          16  attempt=2
+    56      0.597  ActivityCompleted        16  attempt=2 result={"chars":1614,"path":"research-demo.md"}
+    57      0.597  WorkflowCompleted         -  result={"citation_check":{"cited":["idempotency-keys",…
 
 === 9. replay the stored history against current code ===
 $ replayagent replay research-demo --app replayagent.examples.research:create_app
