@@ -179,6 +179,16 @@ review = ctx.wait_signal("review", timeout=...)
   `VersionError` instead of silently taking the wrong branch.
 * Once no old executions remain you may delete the `get_version` call; recorded markers
   that the code no longer asks for are skipped during replay.
+* Markers are looked up **by change id** in the run of consecutive markers at the current
+  position, not by exact position. Deleting one of two adjacent `get_version` calls, or
+  swapping their order, leaves the other call's recorded version intact.
+* The version is decided **once per change id and execution**. When one change touches
+  several sites, call `get_version` with the same id at each: the first call decides
+  (replayed marker, `DEFAULT_VERSION` for an older history, or a newly recorded
+  `max_supported`) and every later call returns that value without recording another
+  marker. An in-flight execution that predates the change therefore takes the old branch
+  at *every* site, even sites it reaches after the end of its history. Each call still
+  checks the decided version against its own `[min_supported, max_supported]`.
 
 The repository proves this with real recorded histories: `tests/golden/research_v0.json`
 was recorded by the research agent *before* the citation check existed
