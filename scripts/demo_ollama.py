@@ -7,7 +7,6 @@ auto-approved. Output varies from run to run because the model is a real LLM.
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 import tempfile
@@ -27,7 +26,7 @@ QUESTION = "How do durable execution engines avoid duplicating side effects afte
 def ollama_up(host: str) -> bool:
     try:
         with urllib.request.urlopen(f"{host}/api/tags", timeout=3) as resp:
-            return resp.status == 200
+            return bool(resp.status == 200)
     except OSError:
         return False
 
@@ -52,17 +51,20 @@ def main() -> int:
         events = store.load_events(wid)
         report = replay_history(app, events, wid)
         store.close()
-    llm = [
-        e.data["result"]
+    llm_cmds = {
+        e.cmd
         for e in events
-        if e.type is EventType.ACTIVITY_COMPLETED and "usage" in json.dumps(e.data["result"])[:2000]
+        if e.type is EventType.ACTIVITY_SCHEDULED and e.data["name"] == "llm.chat"
+    }
+    usage = [
+        e.data["result"]["usage"]
+        for e in events
+        if e.type is EventType.ACTIVITY_COMPLETED and e.cmd in llm_cmds
     ]
-    prompt = sum(r["usage"]["prompt_tokens"] for r in llm if isinstance(r, dict) and "usage" in r)
-    completion = sum(
-        r["usage"]["completion_tokens"] for r in llm if isinstance(r, dict) and "usage" in r
-    )
+    prompt = sum(u["prompt_tokens"] for u in usage)
+    completion = sum(u["completion_tokens"] for u in usage)
     print(
-        f"model {model}: {elapsed:.1f}s wall, {len(llm)} model calls, "
+        f"model {model}: {elapsed:.1f}s wall, {len(usage)} model calls, "
         f"{prompt} prompt + {completion} completion tokens"
     )
     print(f"status {result['status']}, sub-questions: {result['subquestions']}")
