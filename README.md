@@ -241,8 +241,9 @@ the code with no model calls.
 
 `make check` runs `ruff format --check`, `ruff check` (zero warnings), `mypy --strict`
 over `src`, `tests`, `scripts` and `examples`, and `pytest` with branch coverage and an
-85% gate. Last run: **151 passed, total branch coverage 94.95%** (`make check`; the
-coverage table is printed by the `test` target).
+85% gate. Last run: **151 passed, total branch coverage 94.9%** (`make check`; the
+coverage table is printed by the `test` target; the figure moves by a few hundredths
+between runs because a few worker branches depend on thread timing).
 
 | Suite | What it proves |
 |---|---|
