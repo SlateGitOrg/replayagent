@@ -20,3 +20,4 @@ build/
 .demo/
 research-out/
 .env
+.hypothesis/
