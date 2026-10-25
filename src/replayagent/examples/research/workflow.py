@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,7 +19,7 @@ from replayagent.agent import Tool, run_tool_loops, tool
 from replayagent.errors import SignalTimeout
 from replayagent.examples.research.corpus import default_corpus
 from replayagent.llm import chat, system, user
-from replayagent.replay import WorkflowContext
+from replayagent.replay import DEFAULT_VERSION, WorkflowContext
 
 PLANNER_PROMPT = (
     "[planner] You plan research. Break the QUESTION into COUNT focused, non-overlapping "
@@ -40,6 +41,9 @@ REVISER_PROMPT = (
 )
 
 REVIEW_SIGNAL = "review"
+
+#: ``get_version`` change id for the citation check added after the first release.
+CITATION_CHECK = "citation-check"
 
 
 @tool
@@ -112,7 +116,39 @@ def citations(text: str) -> list[str]:
     return out
 
 
+def check_citations(report: str) -> dict[str, Any]:
+    """Activity: verify every ``[doc-id]`` citation names a real corpus document."""
+    corpus = default_corpus()
+    cited = citations(report)
+    return {
+        "cited": cited,
+        "unknown": [c for c in cited if corpus.get(c) is None],
+    }
+
+
+def _strip_unknown(report: str, unknown: list[str]) -> str:
+    for doc_id in unknown:
+        report = report.replace(f"[{doc_id}]", "[citation removed]")
+    return report
+
+
 def research(ctx: WorkflowContext, raw: Any) -> dict[str, Any]:
+    """The research workflow. v1 added a citation check behind ``get_version`` so
+    workflows started by v0 code still replay."""
+    return _research(
+        ctx, raw, citation_check=lambda: ctx.get_version(CITATION_CHECK, DEFAULT_VERSION, 1) >= 1
+    )
+
+
+def research_unguarded(ctx: WorkflowContext, raw: Any) -> dict[str, Any]:
+    """What the v1 change looks like *without* the version guard. Replaying a v0
+    history against it raises NonDeterminismError (used by tests and the demo)."""
+    return _research(ctx, raw, citation_check=lambda: True)
+
+
+def _research(
+    ctx: WorkflowContext, raw: Any, *, citation_check: Callable[[], bool]
+) -> dict[str, Any]:
     params = ResearchParams.from_input(raw)
     q = params.question
     plan = chat(
@@ -137,18 +173,23 @@ def research(ctx: WorkflowContext, raw: Any) -> dict[str, Any]:
         model=params.model,
     ).text
 
+    checked: dict[str, Any] | None = None
+    if citation_check():
+        checked = ctx.activity("research.check_citations", draft)
+        draft = _strip_unknown(draft, checked["unknown"])
+
     reviews: list[dict[str, Any]] = []
     while True:
         try:
             review = ctx.wait_signal(REVIEW_SIGNAL, timeout=params.review_timeout)
         except SignalTimeout:
-            return _result(params, subquestions, notes, draft, reviews, "review_timed_out", None)
+            return _result(params, notes, draft, reviews, checked, "review_timed_out", None)
         review = review if isinstance(review, dict) else {"approve": bool(review)}
         reviews.append(review)
         if review.get("approve"):
             break
         if len(reviews) > params.max_revisions:
-            return _result(params, subquestions, notes, draft, reviews, "rejected", None)
+            return _result(params, notes, draft, reviews, checked, "rejected", None)
         feedback = str(review.get("feedback", "")).strip() or "Improve clarity."
         draft = chat(
             ctx,
@@ -157,25 +198,28 @@ def research(ctx: WorkflowContext, raw: Any) -> dict[str, Any]:
         ).text
 
     published = ctx.activity("research.publish", {"question": q, "report": draft})
-    return _result(params, subquestions, notes, draft, reviews, "published", published)
+    return _result(params, notes, draft, reviews, checked, "published", published)
 
 
 def _result(
     params: ResearchParams,
-    subquestions: list[str],
     notes: list[dict[str, Any]],
     report: str,
     reviews: list[dict[str, Any]],
+    citation_check: dict[str, Any] | None,
     status: str,
     published: Any,
 ) -> dict[str, Any]:
-    return {
+    out = {
         "status": status,
         "question": params.question,
-        "subquestions": subquestions,
+        "subquestions": [n["subquestion"] for n in notes],
         "notes": notes,
         "report": report,
         "citations": citations(report),
         "reviews": reviews,
         "published": published,
     }
+    if citation_check is not None:
+        out["citation_check"] = citation_check
+    return out

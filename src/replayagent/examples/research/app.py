@@ -18,7 +18,12 @@ from typing import Any
 from replayagent.activity_context import info as activity_info
 from replayagent.agent import register_tools
 from replayagent.examples.research.fake_llm import research_responder
-from replayagent.examples.research.workflow import RESEARCH_TOOLS, research
+from replayagent.examples.research.workflow import (
+    RESEARCH_TOOLS,
+    check_citations,
+    research,
+    research_unguarded,
+)
 from replayagent.llm import FakeProvider, LLMProvider, OllamaProvider, register_llm
 from replayagent.registry import ActivityOptions, App
 from replayagent.retry import RetryPolicy
@@ -76,10 +81,19 @@ def make_provider(kind: str | None = None, *, log_path: str | None = None) -> LL
     raise ValueError(f"unknown RESEARCH_PROVIDER {kind!r} (use 'fake' or 'ollama')")
 
 
-def create_app(provider: LLMProvider | None = None, out_dir: str | Path | None = None) -> App:
-    """Build the research agent app (CLI spec: ``replayagent.examples.research:create_app``)."""
+def create_app(
+    provider: LLMProvider | None = None,
+    out_dir: str | Path | None = None,
+    *,
+    guarded: bool = True,
+) -> App:
+    """Build the research agent app (CLI spec: ``replayagent.examples.research:create_app``).
+
+    ``guarded=False`` registers the variant whose citation check is *not* behind
+    ``get_version`` - a deliberately broken deploy for the determinism demo.
+    """
     app = App()
-    app.register_workflow(research, name="research")
+    app.register_workflow(research if guarded else research_unguarded, name="research")
     register_llm(app, provider or make_provider())
     register_tools(app, RESEARCH_TOOLS, retry=RetryPolicy(initial_interval=0.2, maximum_attempts=3))
     target = Path(out_dir or os.environ.get("RESEARCH_OUT_DIR") or "research-out")
@@ -88,4 +102,10 @@ def create_app(provider: LLMProvider | None = None, out_dir: str | Path | None =
         name="research.publish",
         options=ActivityOptions(retry=RetryPolicy(initial_interval=0.5, maximum_attempts=5)),
     )
+    app.register_activity(check_citations, name="research.check_citations")
     return app
+
+
+def create_unguarded_app() -> App:
+    """CLI spec ``replayagent.examples.research:create_unguarded_app`` (broken deploy)."""
+    return create_app(guarded=False)
