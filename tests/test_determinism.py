@@ -71,7 +71,7 @@ def test_replay_detects_changed_results_and_outcomes(make_env: EnvFactory, tmp_p
     assert empty.problem is not None and "not registered" in empty.problem
 
 
-def test_live_deploy_of_unguarded_change_blocks_in_flight_workflow(
+def test_live_v1_workflow_survives_redeploy_with_or_without_the_guard(
     make_env: EnvFactory, tmp_path: Path
 ) -> None:
     good = create_app(out_dir=tmp_path / "out")
