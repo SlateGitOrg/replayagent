@@ -10,8 +10,8 @@ import pytest
 from replayagent import activity_context
 from replayagent.examples.research import ResearchParams, create_app, make_provider
 from replayagent.examples.research.app import create_unguarded_app, make_publisher
-from replayagent.examples.research.fake_llm import research_responder
 from replayagent.examples.research.corpus import Corpus, Document, default_corpus, tokenize
+from replayagent.examples.research.fake_llm import research_responder
 from replayagent.examples.research.workflow import (
     check_citations,
     citations,

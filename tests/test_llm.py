@@ -6,7 +6,7 @@ import threading
 from collections.abc import Callable, Iterator
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -90,13 +90,13 @@ def test_chat_is_durable_and_retried(make_env: EnvFactory) -> None:
 
 
 class _Stub(BaseHTTPRequestHandler):
-    responses: list[tuple[int, bytes]] = []
-    received: list[dict[str, Any]] = []
+    queue: ClassVar[list[tuple[int, bytes]]] = []
+    received: ClassVar[list[dict[str, Any]]] = []
 
-    def do_POST(self) -> None:  # noqa: N802 - http.server API
+    def do_POST(self) -> None:
         length = int(self.headers["Content-Length"])
         _Stub.received.append(json.loads(self.rfile.read(length)))
-        status, body = _Stub.responses.pop(0)
+        status, body = _Stub.queue.pop(0)
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -109,7 +109,7 @@ class _Stub(BaseHTTPRequestHandler):
 
 @pytest.fixture
 def stub() -> Iterator[str]:
-    _Stub.responses, _Stub.received = [], []
+    _Stub.queue, _Stub.received = [], []
     server = HTTPServer(("127.0.0.1", 0), _Stub)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -135,7 +135,7 @@ def test_ollama_success_with_tool_calls(stub: str) -> None:
         "eval_count": 3,
         "done_reason": "stop",
     }
-    _Stub.responses.append((200, json.dumps(body).encode()))
+    _Stub.queue.append((200, json.dumps(body).encode()))
     provider = OllamaProvider(host=stub, model="llama3.1:8b")
     req = LLMRequest(
         (
@@ -162,14 +162,14 @@ def test_ollama_success_with_tool_calls(stub: str) -> None:
 def test_ollama_error_mapping(stub: str) -> None:
     provider = OllamaProvider(host=f"http://{stub}", timeout=5)
     req = LLMRequest((user("hi"),))
-    _Stub.responses.append((404, b'{"error":"model not found"}'))
+    _Stub.queue.append((404, b'{"error":"model not found"}'))
     with pytest.raises(ApplicationError) as info:
         provider.complete(req)
     assert info.value.non_retryable and info.value.type == "LLMRequestError"
-    _Stub.responses.append((503, b"busy"))
+    _Stub.queue.append((503, b"busy"))
     with pytest.raises(LLMTransientError, match="503"):
         provider.complete(req)
-    _Stub.responses.append((200, b"{not json"))
+    _Stub.queue.append((200, b"{not json"))
     with pytest.raises(LLMTransientError, match="invalid JSON"):
         provider.complete(req)
 

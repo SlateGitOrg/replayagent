@@ -13,7 +13,7 @@ import inspect
 import types
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Union, get_args, get_origin, get_type_hints
+from typing import Any, Union, get_args, get_origin, get_type_hints, overload
 
 from replayagent import serde
 from replayagent.errors import ActivityError, ApplicationError
@@ -73,9 +73,19 @@ class Tool:
         return self.fn(**arguments)
 
 
+@overload
+def tool(fn: Callable[..., Any], /) -> Tool: ...
+@overload
 def tool(
-    fn: Callable[..., Any] | None = None, *, name: str | None = None, description: str | None = None
-) -> Any:
+    *, name: str | None = None, description: str | None = None
+) -> Callable[[Callable[..., Any]], Tool]: ...
+def tool(
+    fn: Callable[..., Any] | None = None,
+    /,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+) -> Tool | Callable[[Callable[..., Any]], Tool]:
     """Build a :class:`Tool` from a typed function; the docstring's first paragraph is
     the description shown to the model."""
 

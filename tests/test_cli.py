@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ GOLDEN = Path(__file__).with_name("golden")
 
 
 @pytest.fixture
-def cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+def cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[..., tuple[int, str]]:
     monkeypatch.setenv("RESEARCH_OUT_DIR", str(tmp_path / "out"))
     db = str(tmp_path / "cli.db")
 
@@ -27,7 +28,9 @@ def cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-unt
     return run
 
 
-def test_full_lifecycle(cli, capsys: pytest.CaptureFixture[str]) -> None:  # type: ignore[no-untyped-def]
+def test_full_lifecycle(
+    cli: Callable[..., tuple[int, str]], capsys: pytest.CaptureFixture[str]
+) -> None:
     code, out = cli(
         "start", "research", "--app", APP, "--id", "c1", "--input", '{"question": "q?"}'
     )
@@ -57,7 +60,7 @@ def test_full_lifecycle(cli, capsys: pytest.CaptureFixture[str]) -> None:  # typ
     assert "is completed" in capsys.readouterr().err
 
 
-def test_export_and_replay_file(cli, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+def test_export_and_replay_file(cli: Callable[..., tuple[int, str]], tmp_path: Path) -> None:
     code, out = cli("replay", "--history", str(GOLDEN / "research_v0.json"), "--app", APP)
     assert code == 0
     code, out = cli("replay", "--history", str(GOLDEN / "research_v0.json"), "--app", BROKEN)
@@ -69,7 +72,7 @@ def test_export_and_replay_file(cli, tmp_path: Path) -> None:  # type: ignore[no
     assert json.loads(cli("export", "e1")[1])["events"][0]["seq"] == 1
 
 
-def test_cancel_resume_and_result_codes(cli) -> None:  # type: ignore[no-untyped-def]
+def test_cancel_resume_and_result_codes(cli: Callable[..., tuple[int, str]]) -> None:
     cli("start", "research", "--app", APP, "--id", "x1", "--input", '"q"')
     assert cli("result", "x1")[0] == 4  # still running
     assert cli("resume", "x1")[0] == 1  # not blocked
@@ -91,7 +94,9 @@ def test_cancel_resume_and_result_codes(cli) -> None:  # type: ignore[no-untyped
     assert json.loads(cli("result", "b1")[1])["status"] == "published"
 
 
-def test_errors_are_reported(cli, capsys: pytest.CaptureFixture[str]) -> None:  # type: ignore[no-untyped-def]
+def test_errors_are_reported(
+    cli: Callable[..., tuple[int, str]], capsys: pytest.CaptureFixture[str]
+) -> None:
     assert cli("show", "missing")[0] == 1
     assert cli("start", "research", "--app", "nope", "--input", "1")[0] == 1
     assert cli("start", "research", "--app", APP, "--input", "{bad")[0] == 1

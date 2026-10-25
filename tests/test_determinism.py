@@ -13,11 +13,11 @@ from pathlib import Path
 import pytest
 
 from replayagent import WorkflowStatus
+from replayagent.errors import HistoryCorruptError
 from replayagent.events import EventType
 from replayagent.examples.research import create_app
 from replayagent.examples.research.app import create_unguarded_app
 from replayagent.inspector import export_history, load_history_file, replay_history
-from replayagent.errors import HistoryCorruptError
 from tests.conftest import Env
 
 EnvFactory = Callable[..., Env]
