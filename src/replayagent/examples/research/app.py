@@ -10,6 +10,7 @@ Configuration comes from arguments or environment variables:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sqlite3
 from pathlib import Path
@@ -54,7 +55,7 @@ def make_publisher(out_dir: Path) -> Any:
         tmp = path.with_suffix(".md.tmp")
         tmp.write_text(str(doc["report"]) + "\n", encoding="utf-8")
         tmp.replace(path)
-        with sqlite3.connect(out_dir / "ledger.sqlite") as db:
+        with contextlib.closing(sqlite3.connect(out_dir / "ledger.sqlite")) as db, db:
             db.executescript(LEDGER_SCHEMA)
             db.execute(
                 "INSERT INTO publish_attempts(idempotency_key, attempt) VALUES (?, ?)",

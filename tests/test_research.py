@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 from collections.abc import Callable
 from pathlib import Path
@@ -132,7 +133,7 @@ def test_publisher_is_idempotent_per_activity(tmp_path: Path) -> None:
         publish({"report": "v1"})  # re-execution after a crash
     finally:
         activity_context._reset(token)
-    with sqlite3.connect(tmp_path / "ledger.sqlite") as db:
+    with contextlib.closing(sqlite3.connect(tmp_path / "ledger.sqlite")) as db:
         assert db.execute("SELECT COUNT(*) FROM publish_attempts").fetchone()[0] == 2
         assert db.execute("SELECT COUNT(*) FROM publications").fetchone()[0] == 1
     with pytest.raises(RuntimeError):

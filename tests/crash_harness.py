@@ -10,6 +10,7 @@ the REPLAYAGENT_CRASH environment variable (or from the parent sending SIGKILL).
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sqlite3
 import sys
@@ -56,7 +57,7 @@ def build_app(workdir: Path, slow: float) -> App:
         """Idempotent side effect: one ledger row per idempotency key."""
         key = activity_info().idempotency_key
         time.sleep(slow)
-        with connect() as db:
+        with contextlib.closing(connect()) as db:
             db.execute("INSERT INTO executions(key) VALUES (?)", (key,))
             db.execute("INSERT OR IGNORE INTO charges(key, amount) VALUES (?, ?)", (key, amount))
         return key
@@ -64,7 +65,7 @@ def build_app(workdir: Path, slow: float) -> App:
     @activity(retry=RetryPolicy(initial_interval=0.01, maximum_attempts=20))
     def bump_counter() -> int:
         """Deliberately NOT idempotent (control case for the at-least-once caveat)."""
-        with connect() as db:
+        with contextlib.closing(connect()) as db:
             db.execute("UPDATE counter SET n = n + 1 WHERE id = 1")
             return int(db.execute("SELECT n FROM counter").fetchone()[0])
 

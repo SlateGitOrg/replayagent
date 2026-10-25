@@ -10,6 +10,7 @@ unguarded code change. Uses the deterministic fake model; no network needed.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -132,7 +133,7 @@ def main() -> None:
     llm_cmds = {c for c, n in scheduled.items() if n == "llm.chat"}
     llm_attempts = sum(1 for e in events if e["type"] == "ActivityStarted" and e["cmd"] in llm_cmds)
     model_calls = len((WORK / "model-calls.jsonl").read_text().splitlines())
-    with sqlite3.connect(WORK / "out" / "ledger.sqlite") as db:
+    with contextlib.closing(sqlite3.connect(WORK / "out" / "ledger.sqlite")) as db:
         attempts = db.execute("SELECT COUNT(*) FROM publish_attempts").fetchone()[0]
         published = db.execute("SELECT COUNT(*) FROM publications").fetchone()[0]
     print(f"  history events: {len(events)}   llm.chat commands: {len(llm_cmds)}")

@@ -13,6 +13,7 @@ Invariants checked after every recovery:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import random
@@ -71,7 +72,7 @@ def load_history(workdir: Path) -> list[Event]:
 
 
 def ledger(workdir: Path) -> tuple[dict[str, int], Counter[str], int]:
-    with sqlite3.connect(workdir / "ledger.sqlite") as db:
+    with contextlib.closing(sqlite3.connect(workdir / "ledger.sqlite")) as db:
         charges = dict(db.execute("SELECT key, amount FROM charges").fetchall())
         executions = Counter(k for (k,) in db.execute("SELECT key FROM executions"))
         counter = int(db.execute("SELECT n FROM counter").fetchone()[0])

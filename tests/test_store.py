@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 import subprocess
 import sys
@@ -169,7 +170,7 @@ def test_inbox_and_timer_queries(store: Store) -> None:
 def test_schema_version_and_settings_are_checked(tmp_path: Path) -> None:
     path = tmp_path / "v.db"
     Store(path).close()
-    with sqlite3.connect(path) as db:
+    with contextlib.closing(sqlite3.connect(path)) as db, db:
         db.execute("UPDATE meta SET value='99' WHERE key='schema_version'")
     with pytest.raises(RuntimeError, match="schema version 99"):
         Store(path)
