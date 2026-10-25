@@ -86,7 +86,8 @@ def test_live_deploy_of_unguarded_change_blocks_in_flight_workflow(
     # ...then the guarded code replays it fine, and new workflows record the marker.
     assert replay_history(good, env.client.history(wid), wid).ok
     env.client.signal(wid, "review", {"approve": True})
-    env.run(create_unguarded_app())  # unguarded code still matches *v1* histories
+    # The unguarded code still matches *v1* histories.
+    env.run(create_app(out_dir=tmp_path / "out", guarded=False))
     assert env.client.get(wid).status is WorkflowStatus.COMPLETED
 
 
