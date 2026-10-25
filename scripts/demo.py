@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -24,6 +25,7 @@ APP = "replayagent.examples.research:create_app"
 BROKEN = "replayagent.examples.research:create_unguarded_app"
 WID = "research-demo"
 QUESTION = "How do durable execution engines avoid duplicating side effects after a crash?"
+HOST = socket.gethostname()
 
 
 def env(**extra: str) -> dict[str, str]:
@@ -54,7 +56,8 @@ def cli(
     )
     if show:
         for line in (proc.stdout + proc.stderr).rstrip().splitlines():
-            print(f"  {line}")
+            # Worker identities are host/pid/nonce; mask the machine name in printed output.
+            print(f"  {line.replace(HOST, '<host>')}")
     if crash is None and proc.returncode != 0 and args[0] != "replay":
         raise SystemExit(f"command failed with exit code {proc.returncode}")
     if crash is not None:
