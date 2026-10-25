@@ -154,7 +154,7 @@ def event_details(ev: Event, width: int = 70) -> str:
         return f"attempt={d.get('attempt')}"
     if t is EventType.ACTIVITY_ATTEMPT_FAILED:
         err = d.get("error", {})
-        delay = float(d.get("retry_at", ev.ts)) - ev.ts
+        delay = max(float(d.get("retry_at", ev.ts)) - ev.ts, 0.0)
         msg = _short(err.get("message", ""), width // 2)
         return f"attempt={d.get('attempt')} {err.get('type')}: {msg} retry_in={delay:.3f}s"
     if t is EventType.ACTIVITY_COMPLETED:
