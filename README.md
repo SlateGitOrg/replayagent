@@ -1,5 +1,7 @@
 # replayagent
 
+[![CI](https://github.com/SlateGitOrg/replayagent/actions/workflows/ci.yml/badge.svg)](https://github.com/SlateGitOrg/replayagent/actions/workflows/ci.yml)
+
 A single-node durable execution runtime for LLM agents, in the style of Temporal.
 Workflows are ordinary Python functions. Every LLM call, tool call and other side effect
 runs as an *activity* whose result goes into an event-sourced SQLite history. If the
@@ -87,7 +89,7 @@ algorithms, complexity).
 | `llm/`, `agent.py` | `llm.chat` activity, Fake and Ollama providers; `@tool` schemas, parallel tool loops |
 | `examples/research/` | the research agent: BM25 corpus, planner, tool-using researchers, writer, review signal, idempotent publish |
 
-## Quickstart
+## Quick start
 
 Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
@@ -241,7 +243,7 @@ the code with no model calls.
 
 `make check` runs `ruff format --check`, `ruff check` (zero warnings), `mypy --strict`
 over `src`, `tests`, `scripts` and `examples`, and `pytest` with branch coverage and an
-85% gate. Last run: **151 passed, total branch coverage 94.9%** (`make check`; the
+85% gate. Last run: **156 passed, total branch coverage 95.0%** (`make check`; the
 coverage table is printed by the `test` target; the figure moves by a few hundredths
 between runs because a few worker branches depend on thread timing).
 
@@ -326,8 +328,6 @@ The full list with costs is in [DECISIONS.md](DECISIONS.md). The ones that shape
 - **The research agent is a demo.** Its corpus is ten short documents written for this
   repository (see [DATA.md](DATA.md)); the fake model is a scripted responder; the
   real-model run is a single anecdotal sample, not an evaluation of answer quality.
-- **CI has not run yet.** `.github/workflows/ci.yml` runs `make check` and `make demo` on
-  Ubuntu and macOS, but the repository has not been pushed, so it has never executed.
 
 ## Roadmap
 
@@ -340,4 +340,4 @@ The full list with costs is in [DECISIONS.md](DECISIONS.md). The ones that shape
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

@@ -5,7 +5,7 @@ description = "Durable execution runtime for LLM agents: event-sourced SQLite hi
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
-authors = [{ name = "archit2501" }]
+authors = [{ name = "replayagent contributors" }]
 dependencies = []
 classifiers = [
     "Programming Language :: Python :: 3.12",
