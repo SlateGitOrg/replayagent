@@ -34,7 +34,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "tests", "scripts"]
+src = ["src", "tests", "scripts", "examples"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "C4", "PIE", "PL", "PT", "RET", "TRY", "N"]
@@ -50,7 +50,7 @@ ignore = [
 [tool.mypy]
 strict = true
 python_version = "3.12"
-files = ["src", "tests", "scripts"]
+files = ["src", "tests", "scripts", "examples"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
