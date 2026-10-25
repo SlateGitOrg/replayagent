@@ -322,6 +322,107 @@ def test_removed_get_version_call_skips_stale_marker() -> None:
     assert run(cleaned_up, h).result == ["A", 1, "B"]
 
 
+def test_removed_one_of_two_adjacent_get_version_calls_replays() -> None:
+    def both(ctx: WorkflowContext, inp: Any) -> list[Any]:
+        out = [ctx.activity(greet, "a")]
+        a = ctx.get_version("a", DEFAULT_VERSION, 1)
+        b = ctx.get_version("b", DEFAULT_VERSION, 1)
+        out.append(ctx.activity(other, 2) if b >= 1 else ctx.activity(other, -1))
+        return [*out, a, b]
+
+    def a_removed(ctx: WorkflowContext, inp: Any) -> list[Any]:
+        out = [ctx.activity(greet, "a")]
+        b = ctx.get_version("b", DEFAULT_VERSION, 1)
+        out.append(ctx.activity(other, 2) if b >= 1 else ctx.activity(other, -1))
+        return [*out, b]
+
+    def b_removed(ctx: WorkflowContext, inp: Any) -> list[Any]:
+        out = [ctx.activity(greet, "a")]
+        a = ctx.get_version("a", DEFAULT_VERSION, 1)
+        out.append(ctx.activity(other, 2))
+        return [*out, a]
+
+    def h() -> H:
+        hist = H().activity("greet", "a", result="A").version("a", 1).version("b", 1)
+        return hist.activity("other", 2, result=2)
+
+    assert run(both, h()).result == ["A", 2, 1, 1]
+    assert run(a_removed, h()).result == ["A", 2, 1]
+    assert run(b_removed, h()).result == ["A", 2, 1]
+
+
+def test_get_version_markers_matched_by_change_id_not_order() -> None:
+    def swapped(ctx: WorkflowContext, inp: Any) -> list[Any]:
+        ctx.activity(greet, "a")
+        b = ctx.get_version("b", DEFAULT_VERSION, 2)
+        a = ctx.get_version("a", DEFAULT_VERSION, 2)
+        ctx.activity(other, 2)
+        return [a, b]
+
+    h = H().activity("greet", "a", result="A").version("a", 1).version("b", 2)
+    h.activity("other", 2, result=2)
+    assert run(swapped, h).result == [1, 2]
+
+
+def test_get_version_same_change_id_is_stable_within_an_execution() -> None:
+    def two_sites(ctx: WorkflowContext, inp: Any) -> list[Any]:
+        ctx.activity(greet, "a")
+        first = ctx.get_version("c", DEFAULT_VERSION, 1)
+        ctx.activity(greet, "b")
+        second = ctx.get_version("c", DEFAULT_VERSION, 1)
+        ctx.activity(other, 3)
+        return [first, second]
+
+    # In flight before the change: the first site is replayed (old), so the second site
+    # past the end of history must also be old, and no marker may be recorded for it.
+    old = H().activity("greet", "a", result="A").activity("greet", "b", result="B")
+    res = run(two_sites, old)
+    assert res.status == "suspended"
+    assert [(c.type, c.data.get("name")) for c in res.commands] == [
+        (EventType.ACTIVITY_SCHEDULED, "other")
+    ]
+    old.activity("other", 3, result=3)
+    assert run(two_sites, old).result == [DEFAULT_VERSION, DEFAULT_VERSION]
+
+    # A new execution records one marker and gets the new version at both sites.
+    new = H().activity("greet", "a", result="A")
+    res = run(two_sites, new)
+    assert [c.type for c in res.commands] == [
+        EventType.VERSION_MARKER,
+        EventType.ACTIVITY_SCHEDULED,
+    ]
+    new.version("c", 1).activity("greet", "b", result="B")
+    res = run(two_sites, new)
+    assert [c.type for c in res.commands] == [EventType.ACTIVITY_SCHEDULED]
+    new.activity("other", 3, result=3)
+    assert run(two_sites, new).result == [1, 1]
+
+
+def test_get_version_honours_a_second_recorded_marker_for_the_same_change_id() -> None:
+    # Histories recorded before versions were cached per change id can hold a second marker
+    # for the same id; history is the truth, so it is replayed as recorded.
+    def two_sites(ctx: WorkflowContext, inp: Any) -> list[Any]:
+        ctx.activity(greet, "a")
+        first = ctx.get_version("c", DEFAULT_VERSION, 1)
+        ctx.activity(greet, "b")
+        second = ctx.get_version("c", DEFAULT_VERSION, 1)
+        ctx.activity(other, 3 if second >= 1 else -3)
+        return [first, second]
+
+    h = H().activity("greet", "a", result="A").activity("greet", "b", result="B")
+    h.version("c", 1).activity("other", 3, result=3)
+    assert run(two_sites, h).result == [DEFAULT_VERSION, 1]
+
+
+def test_get_version_cached_version_still_checked_against_range() -> None:
+    def narrowing(ctx: WorkflowContext, inp: Any) -> Any:
+        ctx.get_version("c", DEFAULT_VERSION, 2)  # new execution: records and caches 2
+        return ctx.get_version("c", 0, 1)
+
+    with pytest.raises(VersionError, match="history has version 2"):
+        run(narrowing, H())
+
+
 def test_get_version_live_records_and_old_history_rejected_when_floor_raised() -> None:
     def raised_floor(ctx: WorkflowContext, inp: Any) -> Any:
         ctx.activity(greet, "a")

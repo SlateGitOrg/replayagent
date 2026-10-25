@@ -152,6 +152,10 @@ class WorkflowContext:
         self._suspended = False
         self._violation: WorkflowTaskError | None = None
         self._rng: random.Random | None = None
+        #: Version decided for each change id in this execution (first call wins).
+        self._versions: dict[str, int] = {}
+        #: Positions of version markers already consumed out of order by ``get_version``.
+        self._consumed_markers: set[int] = set()
         self.logger = ReplayAwareLogger(self)
 
     # -- introspection -------------------------------------------------------------------
@@ -296,21 +300,30 @@ class WorkflowContext:
         New executions record ``max_supported``. Executions whose history predates the
         change get :data:`DEFAULT_VERSION`. A recorded version outside
         ``[min_supported, max_supported]`` blocks the workflow with :class:`VersionError`.
+
+        The version is decided once per ``change_id`` and execution: later calls with the
+        same id return the same value (and record nothing), so one change may guard several
+        sites. Recorded markers are matched by change id within the run of markers at the
+        current position, so deleting or reordering ``get_version`` calls for *other* ids
+        does not disturb this one.
         """
         self._guard()
         if min_supported > max_supported:
             raise ValueError("min_supported must be <= max_supported")
-        hist = self._view.commands
-        cmd = self._cursor
-        if cmd < len(hist):
-            ev = hist[cmd]
-            if ev.type is EventType.VERSION_MARKER and ev.data.get("change_id") == change_id:
-                self._cursor += 1
-                version = int(ev.data["version"])
-            else:
-                version = DEFAULT_VERSION
+        recorded = self._take_marker(change_id)
+        if recorded is not None:
+            # History is the truth, even if an older build recorded a second marker for an
+            # id that this execution already decided.
+            version = recorded
+            self._versions.setdefault(change_id, version)
+        elif change_id in self._versions:
+            version = self._versions[change_id]
+        elif self._cursor < len(self._view.commands):
+            version = DEFAULT_VERSION
+            self._versions[change_id] = version
         else:
             version = max_supported
+            self._versions[change_id] = version
             self._record(EventType.VERSION_MARKER, {"change_id": change_id, "version": version})
         if not min_supported <= version <= max_supported:
             self._fail(
@@ -320,6 +333,21 @@ class WorkflowContext:
                 )
             )
         return version
+
+    def _take_marker(self, change_id: str) -> int | None:
+        """Consume the recorded marker for ``change_id`` in the marker run at the cursor."""
+        hist = self._view.commands
+        pos = self._cursor
+        while pos < len(hist) and hist[pos].type is EventType.VERSION_MARKER:
+            if pos not in self._consumed_markers and hist[pos].data.get("change_id") == change_id:
+                self._consumed_markers.add(pos)
+                # Advance over the consumed prefix; unconsumed markers ahead of a consumed one
+                # stay for later calls and are skipped as stale by the next other command.
+                while self._cursor in self._consumed_markers:
+                    self._cursor += 1
+                return int(hist[pos].data["version"])
+            pos += 1
+        return None
 
     # -- internals -----------------------------------------------------------------------
 
