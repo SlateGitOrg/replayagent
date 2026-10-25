@@ -30,8 +30,10 @@ demo-ollama:
 bench:
 	$(UV) run python -u scripts/bench.py
 
+GOLDEN ?= research_v1
+
 golden:
-	$(UV) run python -u scripts/make_golden.py
+	$(UV) run python -u scripts/make_golden.py $(GOLDEN)
 
 clean:
 	rm -rf .demo .pytest_cache .mypy_cache .ruff_cache .coverage htmlcov
